@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3-Day Weather App</title>
+  <link rel="stylesheet" href="output.css">
+<script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+  <style>
+    .tower-bg {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 40%;
+      background: currentColor;
+      clip-path: polygon(0% 100%, 0% 80%, 25% 60%, 45% 75%, 65% 50%, 85% 65%, 100% 45%, 100% 100%);
+      opacity: 0.25;
+      z-index: 2;
+    }
+  </style>
+</head>
+<body class="bg-[#0b0912] text-white min-h-screen flex flex-col items-center justify-center p-4 md:p-8 font-sans">
+
+  <!-- Top Global Interaction Bar -->
+  <div class="w-full max-w-md flex justify-between items-center mb-6 px-4">
+    <h1 id="location-heading" class="text-xl font-bold tracking-tight text-slate-400">Loading Location...</h1>
+    <button id="unit-toggle" class="bg-white/10 hover:bg-white/20 border border-white/10 text-white text-xs font-semibold py-1.5 px-4 rounded-full transition-all active:scale-95">
+      <span>Switch to &deg;F</span>
+    </button>
+  </div>
+
+  <!-- Card Window Element -->
+    <div id="weather-card" class="w-full max-w-md aspect-3/4 rounded-[20px] shadow-2xl relative overflow-hidden flex flex-col justify-between p-8 md:p-10 transition-all duration-700 opacity-0 transform scale-95 bg-cover bg-center">
+    
+    <!-- Dark Glass tint overlay -->
+    <div class="absolute inset-0 bg-black/30 backdrop-blur-[0.5px] z-1"></div>
+
+    <!-- Background -->
+    <div id="tower-element" class="tower-bg text-slate-950"></div>
+
+    <!-- Top Column: Primary Temperature & Status Focus -->
+    <div class="flex flex-col items-center text-center mt-6 relative z-10">
+      <span id="current-temp" class="text-[90px] font-light tracking-tighter leading-none select-none text-white drop-shadow-md">--&deg;</span>
+      <span id="current-condition" class="text-lg font-semibold tracking-wide text-white drop-shadow-sm mt-2 capitalize">Loading...</span>
+      
+      <!-- Centralized Abstract Celestial Symbol -->
+      <div id="current-icon-container" class="text-6xl mt-6 text-white drop-shadow-lg flex items-center justify-center"></div>
+    </div>
+
+    <!-- Error State System Overlay alert -->
+    <div id="error-message" class="hidden absolute inset-x-6 top-1/2 -translate-y-1/2 bg-black/60 backdrop-blur-md border border-red-500/30 p-4 rounded-2xl text-center z-50 text-sm text-red-200">
+      Failed to synchronize environmental records.
+    </div>
+
+    <!-- Bottom Row: 3-Day Forecast Strip Container -->
+    <div id="forecast-grid" class="flex flex-col gap-3 w-full border-t border-white/20 pt-6 relative z-10 drop-shadow-md">
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
