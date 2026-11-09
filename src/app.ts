@@ -2,21 +2,34 @@
  * Photographic Weather App Logic - Local Computer Assets Engine
  * Architecture Scope: Open-Meteo High-Availability API Implementation
  */
-import { JSDOM } from "jsdom";
+/**
+ * Photographic Weather App Logic - Universal Environment Engine
+ */
 
-const dom = new JSDOM(`<!DOCTYPE html><html><body>
-  <div id="location-heading"></div>
-  <div id="current-temp"></div>
-  <div id="current-condition"></div>
-  <div id="unit-toggle"></div>
-  <div id="error-message" class="hidden"></div>
-  <div id="icon-target-container"></div>
-  <div id="weather-cards-grid"></div>
-</body></html>`);
+// 1. Environment Detection and Shadow DOM Setup
+let isBrowserEnvironment = typeof window !== 'undefined' && typeof document !== 'undefined';
 
-(globalThis as any).window = dom.window;
-(globalThis as any).document = dom.window.document;
+if (!isBrowserEnvironment) {
+  // We are running in Node.js (Terminal) -> Dynamically spin up jsdom
+  const { JSDOM } = await import("jsdom");
+  const dom = new JSDOM(`<!DOCTYPE html><html><body>
+    <div id="location-heading"></div>
+    <div id="current-temp"></div>
+    <div id="current-condition"></div>
+    <div id="unit-toggle"></div>
+    <div id="error-message" class="hidden"></div>
+    <div id="current-icon-container"></div>
+    <div id="weather-card" class="opacity-0 scale-95">
+      <div id="forecast-grid"></div>
+      <div id="tower-element"></div>
+    </div>
+  </body></html>`);
 
+  // Mock the terminal runtime context safely
+  (globalThis as any).window = dom.window;
+  (globalThis as any).document = dom.window.document;
+  
+}
 
 
 type WeatherApiPayload = {
@@ -76,7 +89,6 @@ const weatherBackground = {
 } as const;
 
 type WeatherThemeKey = keyof typeof weatherBackground;
-
 
 /**
  * Open-Meteo WMO Weather Code Interpreter Dictionary
@@ -284,6 +296,22 @@ if (unitToggleButton) {
   });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
   triggerWeatherSyncFetch(appState.queryLocation);
-});
+
+// PLACE THIS AT THE VERY BOTTOM OF YOUR APP.TS FILE
+async function runTerminalApp() {
+  try {
+    await triggerWeatherSyncFetch("Calgary"); 
+    
+    console.log("\n=== LIVE WEATHER APP TERMINAL VIEW ===");
+    console.log("Location:   ", document.getElementById("location-heading")?.innerText);
+    console.log("Condition:  ", document.getElementById("current-condition")?.innerText);
+    console.log("Temperature:", document.getElementById("current-temp")?.innerText);
+    console.log("======================================\n");
+  } catch (error) {
+    console.error("Terminal initialization failed:", error);
+  }
+}
+
+// Fire the launcher safely!
+runTerminalApp();

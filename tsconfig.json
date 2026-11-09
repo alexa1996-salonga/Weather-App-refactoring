@@ -10,10 +10,10 @@
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "target": "es2022",
-    "types": [],
+    "types": ["node", "jsdom"],
     // For nodejs:
     // "lib": ["esnext"],
-    "types": ["node", "jsdom"], // For nodejs and jsdom, run npm install -D @types/jsdom
+    // "types": ["node", "jsdom"], // For nodejs and jsdom, run npm install -D @types/jsdom
     // and npm install -D @types/node
 
     // Other Outputs
@@ -43,6 +43,9 @@
     "moduleDetection": "force",
     "skipLibCheck": true,
     "removeComments": true,
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["dist"]
 }

@@ -213,7 +213,19 @@ if (unitToggleButton) {
         executeDOMWidgetRender();
     });
 }
-document.addEventListener('DOMContentLoaded', () => {
-    triggerWeatherSyncFetch(appState.queryLocation);
-});
+triggerWeatherSyncFetch(appState.queryLocation);
+async function runTerminalApp() {
+    try {
+        await triggerWeatherSyncFetch("Calgary");
+        console.log("\n=== LIVE WEATHER APP TERMINAL VIEW ===");
+        console.log("Location:   ", document.getElementById("location-heading")?.innerText);
+        console.log("Condition:  ", document.getElementById("current-condition")?.innerText);
+        console.log("Temperature:", document.getElementById("current-temp")?.innerText);
+        console.log("======================================\n");
+    }
+    catch (error) {
+        console.error("Terminal initialization failed:", error);
+    }
+}
+runTerminalApp();
 //# sourceMappingURL=app.js.map
