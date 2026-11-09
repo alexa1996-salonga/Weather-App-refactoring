@@ -3,7 +3,24 @@
  * Architecture Scope: Open-Meteo High-Availability API Implementation
  */
 
-const appState = {
+type WeatherApiPayload = {
+  current: {
+    weather_code: number;
+    temperature_2m: number;
+  };
+  daily: {
+    time: string[];
+    weather_code: number[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+  };
+};
+
+const appState: {
+  rawPayload: WeatherApiPayload | null;
+  isCelsiusSystem: boolean;
+  queryLocation: string;
+} = {
   rawPayload: null,
   isCelsiusSystem: true,
   queryLocation: 'Calgary',
@@ -40,14 +57,16 @@ const weatherBackground = {
     towerColorClass: "text-slate-950/40",
     textLabel: "Cloudy"
   }
-};
+} as const;
+
+type WeatherThemeKey = keyof typeof weatherBackground;
 
 
 /**
  * Open-Meteo WMO Weather Code Interpreter Dictionary
  * Utilizes JavaScript Switch statements to route numeric tracking codes cleanly
  */
-function interpretWmoCode(code) {
+function interpretWmoCode(code: number): string {
   switch (code) {
     case 0:
     case 1:
@@ -85,27 +104,29 @@ function interpretWmoCode(code) {
   }
 }
 
-function getThemeKey(conditionText) {
+function getThemeKey(conditionText: string): WeatherThemeKey {
   const normText = conditionText.toLowerCase();
-  
+
   if (normText.includes('sunny') || normText.includes('clear')) return 'sunny';
   if (normText.includes('rain') || normText.includes('drizzle') || normText.includes('shower') || normText.includes('thunderstorm')) return 'rainy';
   if (normText.includes('cloudy') || normText.includes('overcast') || normText.includes('mist') || normText.includes('fog')) return 'cloudy';
   if (normText.includes('snow') || normText.includes('flurry') || normText.includes('ice') || normText.includes('sleet')) return 'snowy';
-  
+
   return 'default';
 }
 
-function assignWeatherSymbol(conditionText) {
-  const activeKey = getThemeKey(conditionText);
+function assignWeatherSymbol(conditionText: string): string {
+  const activeKey: WeatherThemeKey = getThemeKey(conditionText);
   return weatherBackground[activeKey].icon;
 }
 
-function applyThematicInterfaceStyles(conditionText) {
+function applyThematicInterfaceStyles(conditionText: string) {
   const cardElement = document.getElementById('weather-card');
   const towerGraphics = document.getElementById('tower-element');
+
+  if (!cardElement || !towerGraphics) return;
   
-  const activeKey = getThemeKey(conditionText);
+  const activeKey: WeatherThemeKey = getThemeKey(conditionText);
   const activeTheme = weatherBackground[activeKey];
   
   // Inject local custom paths cleanly into standard inline style rules
@@ -116,13 +137,21 @@ function applyThematicInterfaceStyles(conditionText) {
   cardElement.className = cardElement.className.replace(/bg-gradient\S+|from-\S+|to-\S+|bg-\[\S+\]/g, '').trim();
 }
 
-function evaluateScaleMetric(celsiusRawVal, appendUnitSymbol = true) {
-  const cleanInteger = parseInt(celsiusRawVal, 10);
-  const processedValue = appState.isCelsiusSystem ? cleanInteger : Math.round((cleanInteger * 9) / 5 + 32);
+function evaluateScaleMetric(celsiusRawVal: number | string, appendUnitSymbol = true): string | number {
+  const numericValue = typeof celsiusRawVal === 'number' ? celsiusRawVal : Number.parseFloat(celsiusRawVal);
+
+  if (Number.isNaN(numericValue)) {
+    return appendUnitSymbol ? '0°' : 0;
+  }
+
+  const processedValue = appState.isCelsiusSystem
+    ? Math.round(numericValue)
+    : Math.round((numericValue * 9) / 5 + 32);
+
   return appendUnitSymbol ? `${processedValue}°` : processedValue;
 }
 
-function transformToDayName(dateString) {
+function transformToDayName(dateString: string) {
   const formatReference = new Date(dateString + 'T00:00:00');
   return formatReference.toLocaleDateString('en-CA', { 
     weekday: 'long', 
@@ -130,7 +159,10 @@ function transformToDayName(dateString) {
   });
 }
 
-async function triggerWeatherSyncFetch(locationTarget) {
+async function triggerWeatherSyncFetch(locationTarget: string) {
+  const resolvedLocationName = locationTarget.trim() || appState.queryLocation;
+  appState.queryLocation = resolvedLocationName;
+
   const latitude = 51.0447;
   const longitude = -114.0719;
   
@@ -138,7 +170,7 @@ async function triggerWeatherSyncFetch(locationTarget) {
   const DOMErrorBox = document.getElementById('error-message');
   
   try {
-    DOMErrorBox.classList.add('hidden');
+    DOMErrorBox?.classList.add('hidden');
     const responseStream = await fetch(apiEndpointUrl);
     if (!responseStream.ok) throw new Error(`Handshake failure: ${responseStream.status}`);
     
@@ -146,8 +178,11 @@ async function triggerWeatherSyncFetch(locationTarget) {
     executeDOMWidgetRender();
   } catch (err) {
     console.error("API error tracing:", err);
-    DOMErrorBox.classList.remove('hidden');
-    document.getElementById('location-heading').innerText = 'Data Offline';
+    DOMErrorBox?.classList.remove('hidden');
+    const locationHeading = document.getElementById('location-heading');
+    if (locationHeading) {
+      locationHeading.innerText = 'Data Offline';
+    }
   }
 }
 
@@ -156,28 +191,43 @@ function executeDOMWidgetRender() {
   if (!dataEngine) return;
 
   // 1. Assign Local City Strings Anchor Nodes
-  document.getElementById('location-heading').innerText = "Calgary, Alberta";
+  const locationHeadingNode = document.getElementById('location-heading');
+  const normalizedLocationName = appState.queryLocation?.trim() || 'Calgary';
+
+  if (locationHeadingNode) {
+    locationHeadingNode.innerText = `${normalizedLocationName}, Alberta`;
+  }
 
   // 2. Process Current Conditions Data Core Properties
   const currentConditionText = interpretWmoCode(dataEngine.current.weather_code);
   applyThematicInterfaceStyles(currentConditionText);
-  
-  document.getElementById('current-condition').innerText = currentConditionText;
-  document.getElementById('current-temp').innerText = evaluateScaleMetric(dataEngine.current.temperature_2m);
-  
-const iconTargetNodeContainer = document.getElementById('current-icon-container');
-iconTargetNodeContainer.innerHTML = `
-<iconify-icon 
-    icon="${assignWeatherSymbol(currentConditionText)}"
-    class="text-[100px] text-white">
-  </iconify-icon>
-`;
+
+  const currentConditionNode = document.getElementById('current-condition');
+  if (currentConditionNode) {
+    currentConditionNode.innerText = currentConditionText;
+  }
+
+  const currentTempNode = document.getElementById('current-temp');
+  if (currentTempNode) {
+    currentTempNode.innerText = String(evaluateScaleMetric(dataEngine.current.temperature_2m));
+  }
+
+  const iconTargetNodeContainer = document.getElementById('current-icon-container');
+  if (iconTargetNodeContainer) {
+    iconTargetNodeContainer.innerHTML = `
+      <iconify-icon 
+          icon="${assignWeatherSymbol(currentConditionText)}"
+          class="text-[100px] text-white">
+        </iconify-icon>
+    `;
+  }
 
   const mainTodayCardItem = document.getElementById('weather-card');
-  mainTodayCardItem.classList.remove('opacity-0', 'scale-95');
+  mainTodayCardItem?.classList.remove('opacity-0', 'scale-95');
 
   // 3. Process 3-Day Layout Matrix Tracks using required array methods (.filter and .map)
   const DOMGridRootContainer = document.getElementById('forecast-grid');
+  if (!DOMGridRootContainer) return;
   DOMGridRootContainer.innerHTML = '';
 
   const dailyTimeline = dataEngine.daily.time; 
@@ -187,10 +237,10 @@ iconTargetNodeContainer.innerHTML = `
 
   // Transform dataset arrays securely using .map blueprints arrays mutations
   const generatedDOMCardCollection = structuralThreeDaySegment.map((dateString, runtimeIndex) => {
-    const dayWmoCode = dataEngine.daily.weather_code[runtimeIndex];
+    const dayWmoCode = dataEngine.daily.weather_code[runtimeIndex] ?? 0;
     const specificDayWeatherText = interpretWmoCode(dayWmoCode);
-    
-    const maxTempC = dataEngine.daily.temperature_2m_max[runtimeIndex];
+
+    const maxTempC = dataEngine.daily.temperature_2m_max[runtimeIndex] ?? 0;
 
     const dynamicHTMLCardNode = document.createElement('div');
     dynamicHTMLCardNode.className = "flex justify-between items-center text-sm font-semibold text-white/95 py-1.5 drop-shadow";
@@ -208,11 +258,15 @@ iconTargetNodeContainer.innerHTML = `
   });
 }
 
-document.getElementById('unit-toggle').addEventListener('click', () => {
-  appState.isCelsiusSystem = !appState.isCelsiusSystem;
-  document.getElementById('unit-toggle').innerHTML = `<span>Switch to &deg;${appState.isCelsiusSystem ? 'F' : 'C'}</span>`;
-  executeDOMWidgetRender();
-});
+const unitToggleButton = document.getElementById('unit-toggle');
+
+if (unitToggleButton) {
+  unitToggleButton.addEventListener('click', () => {
+    appState.isCelsiusSystem = !appState.isCelsiusSystem;
+    unitToggleButton.innerHTML = `<span>Switch to &deg;${appState.isCelsiusSystem ? 'F' : 'C'}</span>`;
+    executeDOMWidgetRender();
+  });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   triggerWeatherSyncFetch(appState.queryLocation);
