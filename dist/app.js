@@ -6,7 +6,7 @@
 const appState = {
   rawPayload: null,
   isCelsiusSystem: true,
-  queryLocation: 'Calgary'
+  queryLocation: 'Calgary',
 };
 
 const weatherBackground = {
