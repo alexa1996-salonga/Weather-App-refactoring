@@ -13,7 +13,7 @@
     "types": [],
     // For nodejs:
     // "lib": ["esnext"],
-    // "types": ["node"],
+    "types": ["node", "jsdom"], // For nodejs and jsdom, run npm install -D @types/jsdom
     // and npm install -D @types/node
 
     // Other Outputs

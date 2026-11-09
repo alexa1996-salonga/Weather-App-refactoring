@@ -2,6 +2,22 @@
  * Photographic Weather App Logic - Local Computer Assets Engine
  * Architecture Scope: Open-Meteo High-Availability API Implementation
  */
+import { JSDOM } from "jsdom";
+
+const dom = new JSDOM(`<!DOCTYPE html><html><body>
+  <div id="location-heading"></div>
+  <div id="current-temp"></div>
+  <div id="current-condition"></div>
+  <div id="unit-toggle"></div>
+  <div id="error-message" class="hidden"></div>
+  <div id="icon-target-container"></div>
+  <div id="weather-cards-grid"></div>
+</body></html>`);
+
+(globalThis as any).window = dom.window;
+(globalThis as any).document = dom.window.document;
+
+
 
 type WeatherApiPayload = {
   current: {

@@ -1,5 +1,15 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+import { JSDOM } from "jsdom";
+const dom = new JSDOM(`<!DOCTYPE html><html><body>
+  <div id="location-heading"></div>
+  <div id="current-temp"></div>
+  <div id="current-condition"></div>
+  <div id="unit-toggle"></div>
+  <div id="error-message" class="hidden"></div>
+  <div id="icon-target-container"></div>
+  <div id="weather-cards-grid"></div>
+</body></html>`);
+globalThis.window = dom.window;
+globalThis.document = dom.window.document;
 const appState = {
     rawPayload: null,
     isCelsiusSystem: true,

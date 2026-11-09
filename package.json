@@ -1,5 +1,5 @@
 {
-  "name": "weather-app",
+  "name": "weather-app-refactoring",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -9,5 +9,12 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "module",
+  "dependencies": {
+    "jsdom": "^31.0.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^26.6.6"
+  }
 }
