@@ -1,41 +1,12 @@
 /**
- * Photographic Weather App Logic - Local Computer Assets Engine
- * Architecture Scope: Open-Meteo High-Availability API Implementation
- */
-/**
  * Photographic Weather App Logic - Universal Environment Engine
  */
 
-// 1. Environment Detection and Shadow DOM Setup
-let isBrowserEnvironment = typeof window !== 'undefined' && typeof document !== 'undefined';
-
-if (!isBrowserEnvironment) {
-  // We are running in Node.js (Terminal) -> Dynamically spin up jsdom
-  const { JSDOM } = await import("jsdom");
-  const dom = new JSDOM(`<!DOCTYPE html><html><body>
-    <div id="location-heading"></div>
-    <div id="current-temp"></div>
-    <div id="current-condition"></div>
-    <div id="unit-toggle"></div>
-    <div id="error-message" class="hidden"></div>
-    <div id="current-icon-container"></div>
-    <div id="weather-card" class="opacity-0 scale-95">
-      <div id="forecast-grid"></div>
-      <div id="tower-element"></div>
-    </div>
-  </body></html>`);
-
-  // Mock the terminal runtime context safely
-  (globalThis as any).window = dom.window;
-  (globalThis as any).document = dom.window.document;
-  
-}
-
-
-type WeatherApiPayload = {
+interface WeatherApiPayload {
   current: {
-    weather_code: number;
     temperature_2m: number;
+    weather_code: number;
+    time: string;
   };
   daily: {
     time: string[];
@@ -43,16 +14,17 @@ type WeatherApiPayload = {
     temperature_2m_max: number[];
     temperature_2m_min: number[];
   };
-};
-
-const appState: {
+}
+interface AppState {
   rawPayload: WeatherApiPayload | null;
   isCelsiusSystem: boolean;
   queryLocation: string;
-} = {
+}
+
+const appState: AppState = {
   rawPayload: null,
   isCelsiusSystem: true,
-  queryLocation: 'Calgary',
+  queryLocation: "Calgary",
 };
 
 const weatherBackground = {
