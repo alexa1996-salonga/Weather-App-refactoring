@@ -1,12 +1,43 @@
-/**
- * Photographic Weather App Logic - Universal Environment Engine
- */
+// Detect browser environment
+let isBrowserEnvironment: boolean =
+  typeof window !== "undefined" &&
+  typeof document !== "undefined";
 
-interface WeatherApiPayload {
+if (!isBrowserEnvironment) {
+  const { JSDOM } = await import("jsdom");
+
+  const dom = new JSDOM(`
+    <!DOCTYPE html>
+    <html>
+      <body>
+        <div id="location-heading"></div>
+        <div id="current-temp"></div>
+        <div id="current-condition"></div>
+        <div id="unit-toggle"></div>
+        <div id="error-message" class="hidden"></div>
+        <div id="current-icon-container"></div>
+        <div id="weather-card" class="opacity-0 scale-95">
+          <div id="forecast-grid"></div>
+          <div id="tower-element"></div>
+        </div>
+      </body>
+    </html>
+  `);
+
+Object.assign(globalThis, {
+    window: dom.window,
+    document: dom.window.document
+});
+
+  (globalThis as typeof globalThis & {
+    document: Document;
+  }).document = dom.window.document;
+}
+
+interface WeatherApiResponse {
   current: {
     temperature_2m: number;
     weather_code: number;
-    time: string;
   };
   daily: {
     time: string[];
@@ -15,11 +46,26 @@ interface WeatherApiPayload {
     temperature_2m_min: number[];
   };
 }
+
 interface AppState {
-  rawPayload: WeatherApiPayload | null;
+  rawPayload: WeatherApiResponse | null;
   isCelsiusSystem: boolean;
   queryLocation: string;
 }
+
+interface WeatherTheme {
+  imagePath: string;
+  icon: string;
+  towerColorClass: string;
+  textLabel: string;
+}
+
+type WeatherThemeKey =
+  | "sunny"
+  | "rainy"
+  | "cloudy"
+  | "snowy"
+  | "default";
 
 const appState: AppState = {
   rawPayload: null,
@@ -27,57 +73,55 @@ const appState: AppState = {
   queryLocation: "Calgary",
 };
 
-const weatherBackground = {
+const weatherBackground: Record<WeatherThemeKey, WeatherTheme> = {
   sunny: {
-    imagePath: "./images/sunny.png",  
-    icon: "ep:sunny",                    
+    imagePath: "./images/sunny.png",
+    icon: "ep:sunny",
     towerColorClass: "text-amber-950/40",
-    textLabel: "Sunny"
+    textLabel: "Sunny",
   },
   rainy: {
     imagePath: "./images/rainy.png",
-    icon: "famicons:rainy-outline",         
+    icon: "famicons:rainy-outline",
     towerColorClass: "text-indigo-950/50",
-    textLabel: "Rain"
+    textLabel: "Rain",
   },
   cloudy: {
     imagePath: "./images/cloudy.png",
-    icon: "carbon:mostly-cloudy",                        
+    icon: "carbon:mostly-cloudy",
     towerColorClass: "text-slate-900/50",
-    textLabel: "Cloudy"
+    textLabel: "Cloudy",
   },
   snowy: {
     imagePath: "./images/snowy.png",
-    icon: "material-symbols-light:weather-snowy-outline",                         
+    icon: "material-symbols-light:weather-snowy-outline",
     towerColorClass: "text-blue-950/40",
-    textLabel: "Snow"
+    textLabel: "Snow",
   },
   default: {
     imagePath: "./images/tower.png",
-    icon: "akar-icons:cloud",                    
+    icon: "akar-icons:cloud",
     towerColorClass: "text-slate-950/40",
-    textLabel: "Cloudy"
-  }
-} as const;
+    textLabel: "Cloudy",
+  },
+};
 
-type WeatherThemeKey = keyof typeof weatherBackground;
-
-/**
- * Open-Meteo WMO Weather Code Interpreter Dictionary
- * Utilizes JavaScript Switch statements to route numeric tracking codes cleanly
- */
 function interpretWmoCode(code: number): string {
   switch (code) {
     case 0:
     case 1:
       return "Sunny";
+
     case 2:
       return "Partly Cloudy";
+
     case 3:
       return "Cloudy";
+
     case 45:
     case 48:
       return "Mist";
+
     case 51:
     case 53:
     case 55:
@@ -88,6 +132,7 @@ function interpretWmoCode(code: number): string {
     case 81:
     case 82:
       return "Rain";
+
     case 71:
     case 73:
     case 75:
@@ -95,195 +140,307 @@ function interpretWmoCode(code: number): string {
     case 85:
     case 86:
       return "Snow";
+
     case 95:
     case 96:
     case 97:
       return "Thunderstorm";
+
     default:
       return "Cloudy";
   }
 }
 
 function getThemeKey(conditionText: string): WeatherThemeKey {
-  const normText = conditionText.toLowerCase();
+  const normalized = conditionText.toLowerCase();
 
-  if (normText.includes('sunny') || normText.includes('clear')) return 'sunny';
-  if (normText.includes('rain') || normText.includes('drizzle') || normText.includes('shower') || normText.includes('thunderstorm')) return 'rainy';
-  if (normText.includes('cloudy') || normText.includes('overcast') || normText.includes('mist') || normText.includes('fog')) return 'cloudy';
-  if (normText.includes('snow') || normText.includes('flurry') || normText.includes('ice') || normText.includes('sleet')) return 'snowy';
+  if (normalized.includes("sunny") || normalized.includes("clear")) {
+    return "sunny";
+  }
 
-  return 'default';
+  if (
+    normalized.includes("rain") ||
+    normalized.includes("drizzle") ||
+    normalized.includes("shower") ||
+    normalized.includes("thunderstorm")
+  ) {
+    return "rainy";
+  }
+
+  if (
+    normalized.includes("cloudy") ||
+    normalized.includes("overcast") ||
+    normalized.includes("mist") ||
+    normalized.includes("fog")
+  ) {
+    return "cloudy";
+  }
+
+  if (
+    normalized.includes("snow") ||
+    normalized.includes("flurry") ||
+    normalized.includes("ice") ||
+    normalized.includes("sleet")
+  ) {
+    return "snowy";
+  }
+
+  return "default";
 }
 
 function assignWeatherSymbol(conditionText: string): string {
-  const activeKey: WeatherThemeKey = getThemeKey(conditionText);
-  return weatherBackground[activeKey].icon;
+  return weatherBackground[getThemeKey(conditionText)].icon;
 }
 
-function applyThematicInterfaceStyles(conditionText: string) {
-  const cardElement = document.getElementById('weather-card');
-  const towerGraphics = document.getElementById('tower-element');
+function applyThematicInterfaceStyles(conditionText: string): void {
+  const cardElement = document.getElementById("weather-card");
+  const towerGraphics = document.getElementById("tower-element");
 
-  if (!cardElement || !towerGraphics) return;
-  
-  const activeKey: WeatherThemeKey = getThemeKey(conditionText);
-  const activeTheme = weatherBackground[activeKey];
-  
-  // Inject local custom paths cleanly into standard inline style rules
+  if (!cardElement || !towerGraphics) {
+    return;
+  }
+
+  const activeTheme = weatherBackground[getThemeKey(conditionText)];
+
   cardElement.style.backgroundImage = `url('${activeTheme.imagePath}')`;
+
   towerGraphics.className = `tower-bg ${activeTheme.towerColorClass}`;
 
-  // Clean wildcard regex replacement sits safely inside the styling loop context block
-  cardElement.className = cardElement.className.replace(/bg-gradient\S+|from-\S+|to-\S+|bg-\[\S+\]/g, '').trim();
+  cardElement.className = cardElement.className
+    .replace(/bg-gradient\S+|from-\S+|to-\S+|bg-\[\S+\]/g, "")
+    .trim();
 }
 
-function evaluateScaleMetric(celsiusRawVal: number | string, appendUnitSymbol = true): string | number {
-  const numericValue = typeof celsiusRawVal === 'number' ? celsiusRawVal : Number.parseFloat(celsiusRawVal);
+function evaluateScaleMetric(
+  celsiusRawVal: number | string,
+  appendUnitSymbol: boolean = true
+): string | number {
+  const numericValue =
+    typeof celsiusRawVal === "number"
+      ? celsiusRawVal
+      : Number.parseFloat(celsiusRawVal);
 
   if (Number.isNaN(numericValue)) {
-    return appendUnitSymbol ? '0°' : 0;
+    return appendUnitSymbol ? "0°" : 0;
   }
 
   const processedValue = appState.isCelsiusSystem
     ? Math.round(numericValue)
     : Math.round((numericValue * 9) / 5 + 32);
 
-  return appendUnitSymbol ? `${processedValue}°` : processedValue;
+  return appendUnitSymbol
+    ? `${processedValue}°`
+    : processedValue;
 }
 
-function transformToDayName(dateString: string) {
-  const formatReference = new Date(dateString + 'T00:00:00');
-  return formatReference.toLocaleDateString('en-CA', { 
-    weekday: 'long', 
-    timeZone: 'America/Edmonton' 
-  });
+function transformToDayName(dateString: string): string {
+  return new Date(`${dateString}T00:00:00`).toLocaleDateString(
+    "en-CA",
+    {
+      weekday: "long",
+      timeZone: "America/Edmonton",
+    }
+  );
 }
 
-async function triggerWeatherSyncFetch(locationTarget: string) {
-  const resolvedLocationName = locationTarget.trim() || appState.queryLocation;
-  appState.queryLocation = resolvedLocationName;
+async function triggerWeatherSyncFetch(
+  locationTarget: string
+): Promise<void> {
+  const resolvedLocation =
+    locationTarget.trim() || appState.queryLocation;
+
+  appState.queryLocation = resolvedLocation;
 
   const latitude = 51.0447;
   const longitude = -114.0719;
-  
-  const apiEndpointUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=America%2FEdmonton`;
-  const DOMErrorBox = document.getElementById('error-message');
-  
+
+  const apiEndpointUrl =
+    `https://api.open-meteo.com/v1/forecast` +
+    `?latitude=${latitude}` +
+    `&longitude=${longitude}` +
+    `&current=temperature_2m,weather_code` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
+    `&timezone=America%2FEdmonton`;
+
+  const errorBox = document.getElementById("error-message");
+
   try {
-    DOMErrorBox?.classList.add('hidden');
-    const responseStream = await fetch(apiEndpointUrl);
-    if (!responseStream.ok) throw new Error(`Handshake failure: ${responseStream.status}`);
-    
-    appState.rawPayload = await responseStream.json();
+    errorBox?.classList.add("hidden");
+
+    const response = await fetch(apiEndpointUrl);
+
+    if (!response.ok) {
+      throw new Error(`Handshake failure: ${response.status}`);
+    }
+
+    appState.rawPayload =
+      (await response.json()) as WeatherApiResponse;
+
     executeDOMWidgetRender();
-  } catch (err) {
-    console.error("API error tracing:", err);
-    DOMErrorBox?.classList.remove('hidden');
-    const locationHeading = document.getElementById('location-heading');
+  } catch (error) {
+    console.error("API error tracing:", error);
+
+    errorBox?.classList.remove("hidden");
+
+    const locationHeading =
+      document.getElementById("location-heading");
+
     if (locationHeading) {
-      locationHeading.innerText = 'Data Offline';
+      locationHeading.innerText = "Data Offline";
     }
   }
 }
 
-function executeDOMWidgetRender() {
+function executeDOMWidgetRender(): void {
   const dataEngine = appState.rawPayload;
-  if (!dataEngine) return;
 
-  // 1. Assign Local City Strings Anchor Nodes
-  const locationHeadingNode = document.getElementById('location-heading');
-  const normalizedLocationName = appState.queryLocation?.trim() || 'Calgary';
-
-  if (locationHeadingNode) {
-    locationHeadingNode.innerText = `${normalizedLocationName}, Alberta`;
+  if (!dataEngine) {
+    return;
   }
 
-  // 2. Process Current Conditions Data Core Properties
-  const currentConditionText = interpretWmoCode(dataEngine.current.weather_code);
-  applyThematicInterfaceStyles(currentConditionText);
+  const locationHeading =
+    document.getElementById("location-heading");
 
-  const currentConditionNode = document.getElementById('current-condition');
+  const locationName =
+    appState.queryLocation.trim() || "Calgary";
+
+  if (locationHeading) {
+    locationHeading.innerText =
+      `${locationName}, Alberta`;
+  }
+
+  const currentCondition = interpretWmoCode(
+    dataEngine.current.weather_code
+  );
+
+  applyThematicInterfaceStyles(currentCondition);
+
+  const currentConditionNode =
+    document.getElementById("current-condition");
+
   if (currentConditionNode) {
-    currentConditionNode.innerText = currentConditionText;
+    currentConditionNode.innerText = currentCondition;
   }
 
-  const currentTempNode = document.getElementById('current-temp');
+  const currentTempNode =
+    document.getElementById("current-temp");
+
   if (currentTempNode) {
-    currentTempNode.innerText = String(evaluateScaleMetric(dataEngine.current.temperature_2m));
+    currentTempNode.innerText = String(
+      evaluateScaleMetric(
+        dataEngine.current.temperature_2m
+      )
+    );
   }
 
-  const iconTargetNodeContainer = document.getElementById('current-icon-container');
-  if (iconTargetNodeContainer) {
-    iconTargetNodeContainer.innerHTML = `
-      <iconify-icon 
-          icon="${assignWeatherSymbol(currentConditionText)}"
-          class="text-[100px] text-white">
-        </iconify-icon>
+  const iconContainer =
+    document.getElementById("current-icon-container");
+
+  if (iconContainer) {
+    iconContainer.innerHTML = `
+      <iconify-icon
+        icon="${assignWeatherSymbol(currentCondition)}"
+        class="text-[100px] text-white">
+      </iconify-icon>
     `;
   }
 
-  const mainTodayCardItem = document.getElementById('weather-card');
-  mainTodayCardItem?.classList.remove('opacity-0', 'scale-95');
+  document
+    .getElementById("weather-card")
+    ?.classList.remove("opacity-0", "scale-95");
 
-  // 3. Process 3-Day Layout Matrix Tracks using required array methods (.filter and .map)
-  const DOMGridRootContainer = document.getElementById('forecast-grid');
-  if (!DOMGridRootContainer) return;
-  DOMGridRootContainer.innerHTML = '';
+  const forecastGrid =
+    document.getElementById("forecast-grid");
 
-  const dailyTimeline = dataEngine.daily.time; 
+  if (!forecastGrid) {
+    return;
+  }
 
-  // Filter downward systematically to explicitly lock exactly 3 tracking day fields
-  const structuralThreeDaySegment = dailyTimeline.filter((_, calendarIndex) => calendarIndex < 3);
+  forecastGrid.innerHTML = "";
 
-  // Transform dataset arrays securely using .map blueprints arrays mutations
-  const generatedDOMCardCollection = structuralThreeDaySegment.map((dateString, runtimeIndex) => {
-    const dayWmoCode = dataEngine.daily.weather_code[runtimeIndex] ?? 0;
-    const specificDayWeatherText = interpretWmoCode(dayWmoCode);
+  const firstThreeDays =
+    dataEngine.daily.time.slice(0, 3);
 
-    const maxTempC = dataEngine.daily.temperature_2m_max[runtimeIndex] ?? 0;
+  firstThreeDays.forEach((dateString, index) => {
+    const weatherCode =
+      dataEngine.daily.weather_code[index] ?? 0;
 
-    const dynamicHTMLCardNode = document.createElement('div');
-    dynamicHTMLCardNode.className = "flex justify-between items-center text-sm font-semibold text-white/95 py-1.5 drop-shadow";
-    dynamicHTMLCardNode.innerHTML = `
-      <span class="w-1/3 text-left tracking-wide">${transformToDayName(dateString)}</span>
-      <span class="w-1/3 text-center capitalize text-xs tracking-wider text-white/80 font-normal">${specificDayWeatherText}</span>
-      <span class="w-1/3 text-right tracking-tighter">${evaluateScaleMetric(maxTempC)}</span>
+    const weatherText =
+      interpretWmoCode(weatherCode);
+
+    const maxTemp =
+      dataEngine.daily.temperature_2m_max[index] ?? 0;
+
+    const card = document.createElement("div");
+
+    card.className =
+      "flex justify-between items-center text-sm font-semibold text-white/95 py-1.5 drop-shadow";
+
+    card.innerHTML = `
+      <span class="w-1/3 text-left tracking-wide">
+        ${transformToDayName(dateString)}
+      </span>
+      <span class="w-1/3 text-center capitalize text-xs tracking-wider text-white/80 font-normal">
+        ${weatherText}
+      </span>
+      <span class="w-1/3 text-right tracking-tighter">
+        ${evaluateScaleMetric(maxTemp)}
+      </span>
     `;
 
-    return dynamicHTMLCardNode;
-  });
-
-  generatedDOMCardCollection.forEach(compiledDOMNode => {
-    DOMGridRootContainer.appendChild(compiledDOMNode);
+    forecastGrid.appendChild(card);
   });
 }
 
-const unitToggleButton = document.getElementById('unit-toggle');
+const unitToggleButton =
+  document.getElementById("unit-toggle");
 
 if (unitToggleButton) {
-  unitToggleButton.addEventListener('click', () => {
-    appState.isCelsiusSystem = !appState.isCelsiusSystem;
-    unitToggleButton.innerHTML = `<span>Switch to &deg;${appState.isCelsiusSystem ? 'F' : 'C'}</span>`;
-    executeDOMWidgetRender();
-  });
+  unitToggleButton.addEventListener(
+    "click",
+    (): void => {
+      appState.isCelsiusSystem =
+        !appState.isCelsiusSystem;
+
+      unitToggleButton.innerHTML = `
+        <span>
+          Switch to °${appState.isCelsiusSystem ? "F" : "C"}
+        </span>
+      `;
+
+      executeDOMWidgetRender();
+    }
+  );
 }
 
-  triggerWeatherSyncFetch(appState.queryLocation);
+void triggerWeatherSyncFetch(appState.queryLocation);
 
-// PLACE THIS AT THE VERY BOTTOM OF YOUR APP.TS FILE
-async function runTerminalApp() {
+async function runTerminalApp(): Promise<void> {
   try {
-    await triggerWeatherSyncFetch("Calgary"); 
-    
+    await triggerWeatherSyncFetch("Calgary");
+
     console.log("\n=== LIVE WEATHER APP TERMINAL VIEW ===");
-    console.log("Location:   ", document.getElementById("location-heading")?.innerText);
-    console.log("Condition:  ", document.getElementById("current-condition")?.innerText);
-    console.log("Temperature:", document.getElementById("current-temp")?.innerText);
+    console.log(
+      "Location:",
+      document.getElementById("location-heading")?.innerText
+    );
+    console.log(
+      "Condition:",
+      document.getElementById("current-condition")?.innerText
+    );
+    console.log(
+      "Temperature:",
+      document.getElementById("current-temp")?.innerText
+    );
     console.log("======================================\n");
   } catch (error) {
-    console.error("Terminal initialization failed:", error);
+    console.error(
+      "Terminal initialization failed:",
+      error
+    );
   }
 }
 
-// Fire the launcher safely!
-runTerminalApp();
+void runTerminalApp();
+
+export {};
