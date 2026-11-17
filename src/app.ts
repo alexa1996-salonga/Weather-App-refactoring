@@ -1,38 +1,7 @@
-// Detect browser environment
-let isBrowserEnvironment: boolean =
-  typeof window !== "undefined" &&
-  typeof document !== "undefined";
-
-if (!isBrowserEnvironment) {
-  const { JSDOM } = await import("jsdom");
-
-  const dom = new JSDOM(`
-    <!DOCTYPE html>
-    <html>
-      <body>
-        <div id="location-heading"></div>
-        <div id="current-temp"></div>
-        <div id="current-condition"></div>
-        <div id="unit-toggle"></div>
-        <div id="error-message" class="hidden"></div>
-        <div id="current-icon-container"></div>
-        <div id="weather-card" class="opacity-0 scale-95">
-          <div id="forecast-grid"></div>
-          <div id="tower-element"></div>
-        </div>
-      </body>
-    </html>
-  `);
-
-Object.assign(globalThis, {
-    window: dom.window,
-    document: dom.window.document
-});
-
-  (globalThis as typeof globalThis & {
-    document: Document;
-  }).document = dom.window.document;
-}
+/**
+ * Photographic Weather App Logic - Local Computer Assets Engine
+ * Architecture Scope: Open-Meteo High-Availability API Implementation
+ */
 
 interface WeatherApiResponse {
   current: {
@@ -60,12 +29,7 @@ interface WeatherTheme {
   textLabel: string;
 }
 
-type WeatherThemeKey =
-  | "sunny"
-  | "rainy"
-  | "cloudy"
-  | "snowy"
-  | "default";
+type WeatherThemeKey = "sunny" | "rainy" | "cloudy" | "snowy" | "default";
 
 const appState: AppState = {
   rawPayload: null,
@@ -111,17 +75,13 @@ function interpretWmoCode(code: number): string {
     case 0:
     case 1:
       return "Sunny";
-
     case 2:
       return "Partly Cloudy";
-
     case 3:
       return "Cloudy";
-
     case 45:
     case 48:
       return "Mist";
-
     case 51:
     case 53:
     case 55:
@@ -132,7 +92,6 @@ function interpretWmoCode(code: number): string {
     case 81:
     case 82:
       return "Rain";
-
     case 71:
     case 73:
     case 75:
@@ -140,72 +99,60 @@ function interpretWmoCode(code: number): string {
     case 85:
     case 86:
       return "Snow";
-
     case 95:
     case 96:
     case 97:
       return "Thunderstorm";
-
     default:
       return "Cloudy";
   }
 }
 
 function getThemeKey(conditionText: string): WeatherThemeKey {
-  const normalized = conditionText.toLowerCase();
+  const normText = conditionText.toLowerCase();
 
-  if (normalized.includes("sunny") || normalized.includes("clear")) {
-    return "sunny";
-  }
-
+  if (normText.includes("sunny") || normText.includes("clear")) return "sunny";
   if (
-    normalized.includes("rain") ||
-    normalized.includes("drizzle") ||
-    normalized.includes("shower") ||
-    normalized.includes("thunderstorm")
-  ) {
+    normText.includes("rain") ||
+    normText.includes("drizzle") ||
+    normText.includes("shower") ||
+    normText.includes("thunderstorm")
+  )
     return "rainy";
-  }
-
   if (
-    normalized.includes("cloudy") ||
-    normalized.includes("overcast") ||
-    normalized.includes("mist") ||
-    normalized.includes("fog")
-  ) {
+    normText.includes("cloudy") ||
+    normText.includes("overcast") ||
+    normText.includes("mist") ||
+    normText.includes("fog")
+  )
     return "cloudy";
-  }
-
   if (
-    normalized.includes("snow") ||
-    normalized.includes("flurry") ||
-    normalized.includes("ice") ||
-    normalized.includes("sleet")
-  ) {
+    normText.includes("snow") ||
+    normText.includes("flurry") ||
+    normText.includes("ice") ||
+    normText.includes("sleet")
+  )
     return "snowy";
-  }
 
   return "default";
 }
 
 function assignWeatherSymbol(conditionText: string): string {
-  return weatherBackground[getThemeKey(conditionText)].icon;
+  const activeKey = getThemeKey(conditionText);
+  return weatherBackground[activeKey].icon;
 }
 
 function applyThematicInterfaceStyles(conditionText: string): void {
   const cardElement = document.getElementById("weather-card");
   const towerGraphics = document.getElementById("tower-element");
 
-  if (!cardElement || !towerGraphics) {
-    return;
-  }
+  if (!cardElement || !towerGraphics) return;
 
-  const activeTheme = weatherBackground[getThemeKey(conditionText)];
+  const activeKey = getThemeKey(conditionText);
+  const activeTheme = weatherBackground[activeKey];
 
   cardElement.style.backgroundImage = `url('${activeTheme.imagePath}')`;
-
   towerGraphics.className = `tower-bg ${activeTheme.towerColorClass}`;
-
   cardElement.className = cardElement.className
     .replace(/bg-gradient\S+|from-\S+|to-\S+|bg-\[\S+\]/g, "")
     .trim();
@@ -215,76 +162,46 @@ function evaluateScaleMetric(
   celsiusRawVal: number | string,
   appendUnitSymbol: boolean = true
 ): string | number {
-  const numericValue =
+  const cleanInteger =
     typeof celsiusRawVal === "number"
-      ? celsiusRawVal
-      : Number.parseFloat(celsiusRawVal);
-
-  if (Number.isNaN(numericValue)) {
-    return appendUnitSymbol ? "0°" : 0;
-  }
+      ? Math.trunc(celsiusRawVal)
+      : parseInt(celsiusRawVal, 10);
 
   const processedValue = appState.isCelsiusSystem
-    ? Math.round(numericValue)
-    : Math.round((numericValue * 9) / 5 + 32);
+    ? cleanInteger
+    : Math.round((cleanInteger * 9) / 5 + 32);
 
-  return appendUnitSymbol
-    ? `${processedValue}°`
-    : processedValue;
+  return appendUnitSymbol ? `${processedValue}°` : processedValue;
 }
 
 function transformToDayName(dateString: string): string {
-  return new Date(`${dateString}T00:00:00`).toLocaleDateString(
-    "en-CA",
-    {
-      weekday: "long",
-      timeZone: "America/Edmonton",
-    }
-  );
+  const formatReference = new Date(`${dateString}T00:00:00`);
+  return formatReference.toLocaleDateString("en-CA", {
+    weekday: "long",
+    timeZone: "America/Edmonton",
+  });
 }
 
-async function triggerWeatherSyncFetch(
-  locationTarget: string
-): Promise<void> {
-  const resolvedLocation =
-    locationTarget.trim() || appState.queryLocation;
-
-  appState.queryLocation = resolvedLocation;
-
+async function triggerWeatherSyncFetch(locationTarget: string): Promise<void> {
   const latitude = 51.0447;
   const longitude = -114.0719;
 
-  const apiEndpointUrl =
-    `https://api.open-meteo.com/v1/forecast` +
-    `?latitude=${latitude}` +
-    `&longitude=${longitude}` +
-    `&current=temperature_2m,weather_code` +
-    `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
-    `&timezone=America%2FEdmonton`;
-
-  const errorBox = document.getElementById("error-message");
+  const apiEndpointUrl = `https://open-meteo.com{latitude}&longitude=${longitude}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=America%2FEdmonton`;
+  const DOMErrorBox = document.getElementById("error-message");
+  const locationHeading = document.getElementById("location-heading");
 
   try {
-    errorBox?.classList.add("hidden");
-
-    const response = await fetch(apiEndpointUrl);
-
-    if (!response.ok) {
-      throw new Error(`Handshake failure: ${response.status}`);
+    DOMErrorBox?.classList.add("hidden");
+    const responseStream = await fetch(apiEndpointUrl);
+    if (!responseStream.ok) {
+      throw new Error(`Handshake failure: ${responseStream.status}`);
     }
 
-    appState.rawPayload =
-      (await response.json()) as WeatherApiResponse;
-
+    appState.rawPayload = (await responseStream.json()) as WeatherApiResponse;
     executeDOMWidgetRender();
-  } catch (error) {
-    console.error("API error tracing:", error);
-
-    errorBox?.classList.remove("hidden");
-
-    const locationHeading =
-      document.getElementById("location-heading");
-
+  } catch (err) {
+    console.error("API error tracing:", err);
+    DOMErrorBox?.classList.remove("hidden");
     if (locationHeading) {
       locationHeading.innerText = "Data Offline";
     }
@@ -293,154 +210,92 @@ async function triggerWeatherSyncFetch(
 
 function executeDOMWidgetRender(): void {
   const dataEngine = appState.rawPayload;
+  if (!dataEngine) return;
 
-  if (!dataEngine) {
-    return;
-  }
-
-  const locationHeading =
-    document.getElementById("location-heading");
-
-  const locationName =
-    appState.queryLocation.trim() || "Calgary";
-
+  const locationHeading = document.getElementById("location-heading");
   if (locationHeading) {
-    locationHeading.innerText =
-      `${locationName}, Alberta`;
+    locationHeading.innerText = "Calgary, Alberta";
   }
 
-  const currentCondition = interpretWmoCode(
+  const currentConditionText = interpretWmoCode(
     dataEngine.current.weather_code
   );
+  applyThematicInterfaceStyles(currentConditionText);
 
-  applyThematicInterfaceStyles(currentCondition);
-
-  const currentConditionNode =
-    document.getElementById("current-condition");
-
+  const currentConditionNode = document.getElementById("current-condition");
   if (currentConditionNode) {
-    currentConditionNode.innerText = currentCondition;
+    currentConditionNode.innerText = currentConditionText;
   }
 
-  const currentTempNode =
-    document.getElementById("current-temp");
-
+  const currentTempNode = document.getElementById("current-temp");
   if (currentTempNode) {
     currentTempNode.innerText = String(
-      evaluateScaleMetric(
-        dataEngine.current.temperature_2m
-      )
+      evaluateScaleMetric(dataEngine.current.temperature_2m)
     );
   }
 
-  const iconContainer =
-    document.getElementById("current-icon-container");
-
-  if (iconContainer) {
-    iconContainer.innerHTML = `
-      <iconify-icon
-        icon="${assignWeatherSymbol(currentCondition)}"
+  const iconTargetNodeContainer = document.getElementById(
+    "current-icon-container"
+  );
+  if (iconTargetNodeContainer) {
+    iconTargetNodeContainer.innerHTML = `
+      <iconify-icon 
+        icon="${assignWeatherSymbol(currentConditionText)}"
         class="text-[100px] text-white">
       </iconify-icon>
     `;
   }
 
-  document
-    .getElementById("weather-card")
-    ?.classList.remove("opacity-0", "scale-95");
+  const mainTodayCardItem = document.getElementById("weather-card");
+  mainTodayCardItem?.classList.remove("opacity-0", "scale-95");
 
-  const forecastGrid =
-    document.getElementById("forecast-grid");
+  const DOMGridRootContainer = document.getElementById("forecast-grid");
+  if (!DOMGridRootContainer) return;
+  DOMGridRootContainer.innerHTML = "";
 
-  if (!forecastGrid) {
-    return;
-  }
+  const dailyTimeline = dataEngine.daily.time;
 
-  forecastGrid.innerHTML = "";
+  // Filter downward to lock 3 tracking day fields
+  const structuralThreeDaySegment = dailyTimeline.filter(
+    (_, calendarIndex) => calendarIndex < 3
+  );
 
-  const firstThreeDays =
-    dataEngine.daily.time.slice(0, 3);
+  // Transform dataset arrays using .map
+  const generatedDOMCardCollection = structuralThreeDaySegment.map(
+    (dateString, runtimeIndex) => {
+      const dayWmoCode = dataEngine.daily.weather_code[runtimeIndex] ?? 0;
+      const specificDayWeatherText = interpretWmoCode(dayWmoCode);
+      const maxTempC = dataEngine.daily.temperature_2m_max[runtimeIndex] ?? 0;
 
-  firstThreeDays.forEach((dateString, index) => {
-    const weatherCode =
-      dataEngine.daily.weather_code[index] ?? 0;
+      const dynamicHTMLCardNode = document.createElement("div");
+      dynamicHTMLCardNode.className =
+        "flex justify-between items-center text-sm font-semibold text-white/95 py-1.5 drop-shadow";
+      dynamicHTMLCardNode.innerHTML = `
+        <span class="w-1/3 text-left tracking-wide">${transformToDayName(dateString)}</span>
+        <span class="w-1/3 text-center capitalize text-xs tracking-wider text-white/80 font-normal">${specificDayWeatherText}</span>
+        <span class="w-1/3 text-right tracking-tighter">${evaluateScaleMetric(maxTempC)}</span>
+      `;
 
-    const weatherText =
-      interpretWmoCode(weatherCode);
+      return dynamicHTMLCardNode;
+    }
+  );
 
-    const maxTemp =
-      dataEngine.daily.temperature_2m_max[index] ?? 0;
-
-    const card = document.createElement("div");
-
-    card.className =
-      "flex justify-between items-center text-sm font-semibold text-white/95 py-1.5 drop-shadow";
-
-    card.innerHTML = `
-      <span class="w-1/3 text-left tracking-wide">
-        ${transformToDayName(dateString)}
-      </span>
-      <span class="w-1/3 text-center capitalize text-xs tracking-wider text-white/80 font-normal">
-        ${weatherText}
-      </span>
-      <span class="w-1/3 text-right tracking-tighter">
-        ${evaluateScaleMetric(maxTemp)}
-      </span>
-    `;
-
-    forecastGrid.appendChild(card);
+  generatedDOMCardCollection.forEach((compiledDOMNode) => {
+    DOMGridRootContainer.appendChild(compiledDOMNode);
   });
 }
 
-const unitToggleButton =
-  document.getElementById("unit-toggle");
-
-if (unitToggleButton) {
-  unitToggleButton.addEventListener(
-    "click",
-    (): void => {
-      appState.isCelsiusSystem =
-        !appState.isCelsiusSystem;
-
-      unitToggleButton.innerHTML = `
-        <span>
-          Switch to °${appState.isCelsiusSystem ? "F" : "C"}
-        </span>
-      `;
-
-      executeDOMWidgetRender();
-    }
-  );
-}
-
-void triggerWeatherSyncFetch(appState.queryLocation);
-
-async function runTerminalApp(): Promise<void> {
-  try {
-    await triggerWeatherSyncFetch("Calgary");
-
-    console.log("\n=== LIVE WEATHER APP TERMINAL VIEW ===");
-    console.log(
-      "Location:",
-      document.getElementById("location-heading")?.innerText
-    );
-    console.log(
-      "Condition:",
-      document.getElementById("current-condition")?.innerText
-    );
-    console.log(
-      "Temperature:",
-      document.getElementById("current-temp")?.innerText
-    );
-    console.log("======================================\n");
-  } catch (error) {
-    console.error(
-      "Terminal initialization failed:",
-      error
-    );
+document.getElementById("unit-toggle")?.addEventListener("click", () => {
+  appState.isCelsiusSystem = !appState.isCelsiusSystem;
+  const toggleBtn = document.getElementById("unit-toggle");
+  if (toggleBtn) {
+    toggleBtn.innerHTML = `<span>Switch to &deg;${
+      appState.isCelsiusSystem ? "F" : "C"
+    }</span>`;
   }
-}
+  executeDOMWidgetRender();
+});
 
-void runTerminalApp();
-
-export {};
+document.addEventListener("DOMContentLoaded", () => {
+  void triggerWeatherSyncFetch(appState.queryLocation);
+});

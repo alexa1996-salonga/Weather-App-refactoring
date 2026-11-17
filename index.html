@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3-Day Weather App</title>
   <link rel="stylesheet" href="output.css">
-<script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+  <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
+
+  <script type="module" src="./dist/app.js" defer></script>
+
   <style>
     .tower-bg {
       position: absolute;
@@ -45,7 +48,7 @@
       <span id="current-condition" class="text-lg font-semibold tracking-wide text-white drop-shadow-sm mt-2 capitalize">Loading...</span>
       
       <!-- Centralized Abstract Celestial Symbol -->
-      <div id="current-icon-container" class="text-6xl mt-6 text-white drop-shadow-lg flex items-center justify-center"></div>
+      <div id="current-icon-container" class="text-6xl mt-6 text-white drop-shadow-lg flenx items-center justify-center"></div>
     </div>
 
     <!-- Error State System Overlay alert -->
@@ -58,6 +61,5 @@
     </div>
 
   </div>
-<script type="module" src="./dist/app.js"></script>
 </body>
 </html>
